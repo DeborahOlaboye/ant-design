@@ -8,9 +8,12 @@ import useLayoutEffect from '@rc-component/util/lib/hooks/useLayoutEffect';
 import { composeRef } from '@rc-component/util/lib/ref';
 import { clsx } from 'clsx';
 
+import type { SemanticClassNamesType, SemanticStylesType } from '../../_util/hooks';
+import { useMergeSemantic } from '../../_util/hooks';
 import isNonNullable from '../../_util/isNonNullable';
 import { isStyleSupport } from '../../_util/styleChecker';
 import { ConfigContext } from '../../config-provider';
+import { useComponentConfig } from '../../config-provider/context';
 import useLocale from '../../locale/useLocale';
 import type { TooltipProps } from '../../tooltip';
 import Tooltip from '../../tooltip';
@@ -28,6 +31,23 @@ import { isEleEllipsis, isValidText } from './util';
 
 export type BaseType = 'secondary' | 'success' | 'warning' | 'danger';
 
+export type TypographySemanticClassNames = {
+  root?: string;
+  textarea?: string;
+};
+
+export type TypographySemanticStyles = {
+  root?: React.CSSProperties;
+  textarea?: React.CSSProperties;
+};
+
+export type TypographyClassNamesType = SemanticClassNamesType<
+  BlockProps,
+  TypographySemanticClassNames
+>;
+
+export type TypographyStylesType = SemanticStylesType<BlockProps, TypographySemanticStyles>;
+
 export interface CopyConfig {
   text?: string | (() => string | Promise<string>);
   onCopy?: (event?: React.MouseEvent<HTMLButtonElement>) => void;
@@ -37,7 +57,7 @@ export interface CopyConfig {
   tabIndex?: number;
 }
 
-interface EditConfig {
+export interface EditConfig {
   text?: string;
   editing?: boolean;
   icon?: React.ReactNode;
@@ -73,6 +93,8 @@ export interface BlockProps<C extends keyof JSX.IntrinsicElements = keyof JSX.In
   type?: BaseType;
   disabled?: boolean;
   ellipsis?: boolean | EllipsisConfig;
+  classNames?: TypographyClassNamesType;
+  styles?: TypographyStylesType;
   // decorations
   code?: boolean;
   mark?: boolean;
@@ -133,9 +155,15 @@ const Base = React.forwardRef<HTMLElement, BlockProps>((props, ref) => {
     copyable,
     component,
     title,
+    classNames,
+    styles,
     ...restProps
   } = props;
   const { getPrefixCls, direction } = React.useContext(ConfigContext);
+  const {
+    classNames: contextClassNames,
+    styles: contextStyles,
+  } = useComponentConfig('typography');
   const [textLocale] = useLocale('Text');
 
   const typographyRef = React.useRef<HTMLElement>(null);
@@ -143,6 +171,13 @@ const Base = React.forwardRef<HTMLElement, BlockProps>((props, ref) => {
 
   // ============================ MISC ============================
   const prefixCls = getPrefixCls('typography', customizePrefixCls);
+
+  // ============================ Semantic ============================
+  const [mergedClassNames, mergedStyles] = useMergeSemantic<
+    TypographyClassNamesType,
+    TypographyStylesType,
+    BlockProps
+  >([contextClassNames, classNames], [contextStyles, styles], { props });
 
   const textProps = omit(restProps, DECORATION_PROPS);
 
@@ -333,13 +368,15 @@ const Base = React.forwardRef<HTMLElement, BlockProps>((props, ref) => {
         onCancel={onEditCancel}
         onEnd={editConfig.onEnd}
         prefixCls={prefixCls}
-        className={className}
-        style={style}
+        className={clsx(className, mergedClassNames.root)}
+        style={{ ...mergedStyles.root, ...style }}
         direction={direction}
         component={component}
         maxLength={editConfig.maxLength}
         autoSize={editConfig.autoSize}
         enterIcon={editConfig.enterIcon}
+        textareaClassName={mergedClassNames.textarea}
+        textareaStyle={mergedStyles.textarea}
       />
     );
   }
@@ -443,9 +480,11 @@ const Base = React.forwardRef<HTMLElement, BlockProps>((props, ref) => {
                 [`${prefixCls}-link`]: component === 'a',
               },
               className,
+              mergedClassNames.root,
             )}
             prefixCls={customizePrefixCls}
             style={{
+              ...mergedStyles.root,
               ...style,
               WebkitLineClamp: cssLineClamp ? rows : undefined,
             }}
